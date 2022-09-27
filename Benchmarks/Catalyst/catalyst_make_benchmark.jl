@@ -7,8 +7,8 @@ Pkg.activate(".")
 # Fetch packages.
 using BenchmarkTools
 using DifferentialEquations
-using DiffEqJump
 using JSON
+using JumpProcesses
 using LSODA
 using ModelingToolkit
 using OrdinaryDiffEq
@@ -31,8 +31,8 @@ modelName,methodName,minT,maxT,nT = ARGS[1:5]
 lengs = 10 .^(range(parse(Float64,minT),stop=parse(Float64,maxT),length=parse(Int64,nT))); 
 
 # Sets the method.
-solver = Dict(["lsoda" => lsoda, "CVODE_BDF" => CVODE_BDF, "TRBDF2" => TRBDF2, "KenCarp4" => KenCarp4, "QNDF" => QNDF, "FBDF" => FBDF, "Rosenbrock23" => Rosenbrock23, "Direct" => Direct, "SortingDirect" => SortingDirect, "RSSA" => RSSA, "RSSACR" => RSSACR])[methodName]
-methodType = Dict(["lsoda" => :ODE, "CVODE_BDF" => :ODE , "TRBDF2" => :ODE , "KenCarp4" => :ODE , "QNDF" => :ODE, "FBDF" => :ODE, "Rosenbrock23" => :ODE, "Direct" => :Jump , "SortingDirect" => :Jump , "RSSA" => :Jump , "RSSACR" => :Jump])[methodName]
+solver = Dict(["lsoda" => lsoda, "CVODE_BDF" => CVODE_BDF, "TRBDF2" => TRBDF2, "KenCarp4" => KenCarp4, "QNDF" => QNDF, "FBDF" => FBDF, "Rosenbrock23" => Rosenbrock23, "Tsit5" => Tsit5, "BS5" => BS5, "VCABM" => VCABM, "Vern6" => Vern6, "Vern7" => Vern7, "Vern8" => Vern8, "Vern9" => Vern9, "Direct" => Direct, "SortingDirect" => SortingDirect, "RSSA" => RSSA, "RSSACR" => RSSACR])[methodName]
+methodType = Dict(["lsoda" => :ODE, "CVODE_BDF" => :ODE , "TRBDF2" => :ODE , "KenCarp4" => :ODE , "QNDF" => :ODE, "FBDF" => :ODE, "Rosenbrock23" => :ODE, "Tsit5" => :ODE, "BS5" => :ODE, "VCABM" => :ODE, "Vern6" => :ODE, "Vern7" => :ODE, "Vern8" => :ODE, "Vern9" => :ODE, "Direct" => :Jump , "SortingDirect" => :Jump , "RSSA" => :Jump , "RSSACR" => :Jump])[methodName]
 
 # Load model.
 if (modelName=="BCR") && (methodType == :Jump)
@@ -49,7 +49,8 @@ if methodType == :ODE
     linsolName = ARGS[6]
     jac = in("jac", ARGS)
     sparse = in("sparse", ARGS)
-    linsolver = Dict(["NoLinSolver" => nothing, "KLU" => :KLU, "LapackDense" => :LapackDense, "GMRES" => :GMRES, "KLUFactorization" => KLUFactorization(), "KrylovJL_GMRES" => KrylovJL_GMRES(), "RFLUFactorization" => RFLUFactorization()])[linsolName]
+    autodiff = !in("autodifffalse", ARGS)
+    linsolver = Dict(["NoLinSolver" => nothing, "KLU" => :KLU, "LapackDense" => :LapackDense, "GMRES" => :GMRES, "KLUFactorization" => KLUFactorization(), "KrylovJL_GMRES" => KrylovJL_GMRES()])[linsolName]
 
     # Declares beginning of benchmark.
     println("\n-----     Beginning benchmarks for $(modelName) using $(methodName) with jac=$(jac),  with sparse=$(sparse), and with linsolver=$(linsolName).     -----")
@@ -57,15 +58,11 @@ if methodType == :ODE
     # Run ODE benchmark.
     oprob = ODEProblem(convert(ODESystem,model.rn),Float64[],(0.0,0.0),Float64[],sparse=sparse,jac=jac)
     if isnothing(linsolver)
-        solver = solver()
+        solver = solver(autodiff=autodiff)
     elseif methodName=="CVODE_BDF"
-        solver = solver(linear_solver=linsolver)
+        solver = solver(linear_solver=linsolver,autodiff=autodiff)
     else
-        if in(methodName,["TRBDF2", "KenCarp4", "QNDF", "FBDF", "Rosenbrock23"]) && in(modelName,["BCR", "fceri_gamma2"]) && !jac
-            solver = solver(linsolve=linsolver,autodiff=false)        
-        else
-            solver = solver(linsolve=linsolver)
-        end
+        solver = solver(linsolve=linsolver,autodiff=autodiff)
     end
     abstol = (in(methodName,["QNDF", "FBDF"]) ? 1e-6 : 1e-12); 
     benchmarks = map(leng -> (op_interal = remake(oprob,tspan=(0.0,leng)); (@benchmark solve($op_interal,$solver,abstol=abstol,reltol=1e-6));), lengs);

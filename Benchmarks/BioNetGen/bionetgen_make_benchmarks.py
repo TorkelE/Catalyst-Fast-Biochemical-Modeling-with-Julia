@@ -15,7 +15,10 @@ minT = float(sys.argv[3])
 maxT = float(sys.argv[4])
 nT = int(sys.argv[5])
 num_sims = int(sys.argv[6])
-sparse = (len(sys.argv) == 8) & (sys.argv[7] == 'sparse')
+sparse = False
+if len(sys.argv) == 8:
+    sparse == 'sparse'
+
 
 # Benchmarking parameters
 n = num_sims

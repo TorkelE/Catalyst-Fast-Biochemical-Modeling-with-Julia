@@ -24,12 +24,12 @@ lengs = numpy.logspace(minT, maxT, num=nT)
 # Benchmarking functions.
 def make_ODE_benchmark(model,n,leng):
     def benchmark_func():
-        model.run(solver=ODESolver,t=leng,integrator='lsoda',integrator_options={"atol":10e-12,"rtol":10e-6})
+        model.run(solver=ODESolver,t=leng,increment=1.0,integrator='lsoda',integrator_options={"atol":10e-12,"rtol":10e-6})
     durations = timeit.Timer(benchmark_func).repeat(repeat=n, number=1)
     return durations
 def make_Gillespie_benchmark(model,n,leng):
     def benchmark_func():
-        model.run(solver=SSACSolver,t=leng)
+        model.run(solver=SSACSolver,t=leng,increment=1.0)
     durations = timeit.Timer(benchmark_func).repeat(repeat=n, number=1)
     return durations
 
